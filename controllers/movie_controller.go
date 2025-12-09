@@ -26,14 +26,14 @@ func GetMovies(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to fetch movies"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to fetch movies" + err.Error()})
 		return
 	}
 	defer curr.Close(ctx)
 
 	if err := curr.All(ctx, &movies); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to fetch movies"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to fetch movies " + err.Error()})
 		return
 	}
 
