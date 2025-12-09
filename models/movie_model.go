@@ -1,12 +1,12 @@
 package models
 
 import (
-	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Genre struct {
 	GenreID   int    `bson:"genre_id" json:"genre_id" validate:"required"`
-	GenreName string `bson:"genre_name" json:"genre_name" validate:"required, min=2, max=100"`
+	GenreName string `bson:"genre_name" json:"genre_name" validate:"required,min=2,max=100"`
 }
 type Ranking struct {
 	RankingValue int `bson:"ranking_value" json:"ranking_value" validate:"required"`
@@ -15,12 +15,12 @@ type Ranking struct {
 }
 
 type Movie struct {
-	ID          bson.ObjectID `bson:"_id" json:"id,omitempty"`
-	ImdbID      string        `bson:"imdb_id" json:"imdb_id" validate:"required"`
-	Title       string        `bson:"title" json:"title" validate:"required,min=2,max=500"`
-	PosterPath  string        `bson:"poster_path" json:"poster_path" validate:"required,url"` // moviedb website available posters can be used
-	YoutubeID   string        `bson:"youtube_id" json:"youtube_id" validate:"required"`       // This id will point to trailer of each movie
-	Genre       []Genre       `bson:"genres" json:"genres" validate:"required,dive"`          // keyword dive ensures nested keyword genre is also validated
-	AdminReview string        `bson:"admin_review" json:"admin_review" validate:"required"`
-	Ranking     Ranking       `bson:"rankings" json:"rankings" validate:"required"`
+	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	ImdbID      string             `bson:"imdb_id" json:"imdb_id" validate:"required"`
+	Title       string             `bson:"title" json:"title" validate:"required,min=2,max=500"`
+	PosterPath  string             `bson:"poster_path" json:"poster_path" validate:"required,url"` // moviedb website available posters can be used
+	YoutubeID   string             `bson:"youtube_id" json:"youtube_id" validate:"required"`       // This id will point to trailer of each movie
+	Genre       []Genre            `bson:"genres" json:"genres" validate:"required,dive"`          // keyword dive ensures nested keyword genre is also validated
+	AdminReview string             `bson:"admin_review" json:"admin_review"`
+	Ranking     Ranking            `bson:"rankings" json:"rankings" validate:"required"`
 }

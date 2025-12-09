@@ -16,6 +16,7 @@ func main() {
 		w.Write([]byte("Hello"))
 	})
 	router.Get("/movies", controllers.GetMovies)
+	router.Post("/movie", controllers.AddMovie)
 
 	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatalf("server not started error %v", err)
