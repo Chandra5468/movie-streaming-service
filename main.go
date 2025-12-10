@@ -11,6 +11,7 @@ import (
 
 	"github.com/Chandra5468/movie-streaming/controllers"
 	"github.com/Chandra5468/movie-streaming/database"
+	custommiddleware "github.com/Chandra5468/movie-streaming/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -23,9 +24,15 @@ func main() {
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)    // Log all HTTP requests
 	router.Use(middleware.Recoverer) // Recover from panics
+	// global custom middleware
+	router.Use(custommiddleware.CORS)
 
+	router.Route("/api", func(r chi.Router) {
+		r.Use(custommiddleware.Auth)
+		router.Post("/movie", controllers.AddMovie)
+		router.Post("/register", controllers.RegisterUser)
+	})
 	router.Get("/movies", controllers.GetMovies)
-	router.Post("/movie", controllers.AddMovie)
 
 	server := &http.Server{
 		Addr:         ":8080",
