@@ -7,6 +7,7 @@ import (
 
 	"github.com/Chandra5468/movie-streaming/database"
 	"github.com/Chandra5468/movie-streaming/models"
+	"github.com/Chandra5468/movie-streaming/utils"
 	"github.com/go-playground/validator/v10"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -32,6 +33,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid input"})
+		return
 	}
 
 	validate := validator.New()
@@ -84,4 +86,61 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "successful"})
+}
+
+func LoginUser(w http.ResponseWriter, r *http.Request) {
+	var userLogin models.UserLogin
+	if err := json.NewDecoder(r.Body).Decode(&userLogin); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid input"})
+		return
+	}
+
+	var foundUser models.User
+	err := userCollection.FindOne(r.Context(), bson.D{
+		bson.E{
+			Key:   "email",
+			Value: userLogin.Email,
+		},
+	}).Decode(&foundUser)
+
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid email or password"})
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(userLogin.Password))
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid password"})
+		return
+	}
+
+	token, refreshToken, err := utils.GenerateAllTokens(foundUser.Email, foundUser.FirstName, foundUser.LastName, foundUser.Role, foundUser.UserID)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to generate token"})
+		return
+	}
+
+	err = utils.UpdateAllTokens(foundUser.UserID, token, refreshToken)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to update tokens"})
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(models.UserResponse{
+		UserId:          foundUser.UserID,
+		FirstName:       foundUser.FirstName,
+		LastName:        foundUser.LastName,
+		Email:           foundUser.Email,
+		Role:            foundUser.Role,
+		Token:           token,
+		RefreshToken:    refreshToken,
+		FavouriteGenres: foundUser.FavouriteGenres,
+	})
+
 }

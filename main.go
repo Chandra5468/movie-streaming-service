@@ -28,9 +28,14 @@ func main() {
 	router.Use(custommiddleware.CORS)
 
 	router.Route("/api", func(r chi.Router) {
-		r.Use(custommiddleware.Auth)
-		router.Post("/movie", controllers.AddMovie)
-		router.Post("/register", controllers.RegisterUser)
+		r.Post("/register", controllers.RegisterUser)
+		r.Post("/login", controllers.LoginUser)
+
+		// Protected routes
+		r.Group(func(protected chi.Router) {
+			protected.Use(custommiddleware.Auth)
+			protected.Post("/movie", controllers.AddMovie)
+		})
 	})
 	router.Get("/movies", controllers.GetMovies)
 
