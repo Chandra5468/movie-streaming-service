@@ -35,9 +35,9 @@ func main() {
 		r.Group(func(protected chi.Router) {
 			protected.Use(custommiddleware.Auth)
 			protected.Post("/movie", controllers.AddMovie)
+			router.Get("/movies", controllers.GetMovies)
 		})
 	})
-	router.Get("/movies", controllers.GetMovies)
 
 	server := &http.Server{
 		Addr:         ":8080",
