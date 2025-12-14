@@ -253,8 +253,8 @@ func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		MaxAge: 86400, // expires in 24 hrs
 		Path:   "/",
 		// Domain: ,
-		Secure: true,
-		// SameSite: ,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		HttpOnly: true,
 	})
 	http.SetCookie(w, &http.Cookie{
@@ -263,8 +263,8 @@ func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		MaxAge: 604800, // expires in 1 week
 		Path:   "/",
 		// Domain: ,
-		Secure: true,
-		// SameSite: ,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		HttpOnly: true,
 	})
 
