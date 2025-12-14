@@ -116,3 +116,25 @@ func ValidateToken(tokenString string) (*SignedDetails, error) {
 
 	return claims, nil
 }
+
+func ValidateRefreshToken(tokenString string) (SignedDetails, error) {
+	claims := SignedDetails{}
+
+	token, err := jwt.ParseWithClaims(tokenString, &claims, func(t *jwt.Token) (any, error) {
+		return []byte(SECRET_REFRESH_KEY), nil
+	})
+
+	if err != nil {
+		return SignedDetails{}, err
+	}
+
+	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		return SignedDetails{}, err
+	}
+
+	if claims.ExpiresAt.Time.Before(time.Now()) {
+		return SignedDetails{}, errors.New("refresh token has expired")
+	}
+
+	return claims, nil
+}

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -131,16 +132,142 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "failed to update tokens"})
 		return
 	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   86400,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode, // why to choose this one
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/",
+		MaxAge:   604800,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
+	})
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(models.UserResponse{
-		UserId:          foundUser.UserID,
-		FirstName:       foundUser.FirstName,
-		LastName:        foundUser.LastName,
-		Email:           foundUser.Email,
-		Role:            foundUser.Role,
-		Token:           token,
-		RefreshToken:    refreshToken,
+		UserId:    foundUser.UserID,
+		FirstName: foundUser.FirstName,
+		LastName:  foundUser.LastName,
+		Email:     foundUser.Email,
+		Role:      foundUser.Role,
+		// Token:           token,
+		// RefreshToken:    refreshToken,
 		FavouriteGenres: foundUser.FavouriteGenres,
 	})
 
+}
+
+func LogoutUser(w http.ResponseWriter, r *http.Request) {
+	var UserLogout struct {
+		UserId string `json:"user_id"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&UserLogout)
+
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	err = utils.UpdateAllTokens(UserLogout.UserId, "", "")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1, // negative max age will delete token
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
+	})
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]bool{"successful": true})
+}
+
+func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 100*time.Second)
+	defer cancel()
+
+	refreshTokenVar, err := r.Cookie("refresh_token")
+	refreshToken := refreshTokenVar.Value
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unable to retrieve refresh token from cookie"})
+		return
+	}
+
+	claim, err := utils.ValidateRefreshToken(refreshToken)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid or expired refresh token"})
+		return
+	}
+	user := models.User{}
+	err = userCollection.FindOne(ctx, bson.D{
+		bson.E{
+			Key:   "user_id",
+			Value: claim.UserId,
+		},
+	}).Decode(&user)
+
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "User not found"})
+		return
+	}
+
+	newToken, newRefreshToken, _ := utils.GenerateAllTokens(user.Email, user.FirstName, user.LastName, user.Role, user.UserID)
+	err = utils.UpdateAllTokens(user.UserID, newToken, newRefreshToken)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Error updating tokens"})
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:   "access_token",
+		Value:  newToken,
+		MaxAge: 86400, // expires in 24 hrs
+		Path:   "/",
+		// Domain: ,
+		Secure: true,
+		// SameSite: ,
+		HttpOnly: true,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:   "refresh_token",
+		Value:  newRefreshToken,
+		MaxAge: 604800, // expires in 1 week
+		Path:   "/",
+		// Domain: ,
+		Secure: true,
+		// SameSite: ,
+		HttpOnly: true,
+	})
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
