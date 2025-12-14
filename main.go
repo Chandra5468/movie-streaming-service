@@ -34,6 +34,7 @@ func main() {
 		// Protected routes
 		r.Group(func(protected chi.Router) {
 			protected.Use(custommiddleware.Auth)
+			protected.Post("/logout", controllers.LogoutUser)
 			protected.Post("/movie", controllers.AddMovie)
 			protected.Get("/movies", controllers.GetMovies)
 			protected.Patch("/updatereview/:imdb_id", controllers.AdminReviewUpdate)
