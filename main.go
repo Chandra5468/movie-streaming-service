@@ -35,7 +35,9 @@ func main() {
 		r.Group(func(protected chi.Router) {
 			protected.Use(custommiddleware.Auth)
 			protected.Post("/movie", controllers.AddMovie)
-			router.Get("/movies", controllers.GetMovies)
+			protected.Get("/movies", controllers.GetMovies)
+			protected.Patch("/updatereview/:imdb_id", controllers.AdminReviewUpdate)
+			protected.Get("/recommended/movies", controllers.GetRecommendedMovies)
 		})
 	})
 

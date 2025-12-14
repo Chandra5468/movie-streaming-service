@@ -11,10 +11,12 @@ import (
 
 	"github.com/Chandra5468/movie-streaming/database"
 	"github.com/Chandra5468/movie-streaming/models"
+	"github.com/Chandra5468/movie-streaming/utils"
 	"github.com/go-playground/validator/v10"
 	"github.com/tmc/langchaingo/llms/openai"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var movieCollection *mongo.Collection = database.OpenCollection("movies")
@@ -78,8 +80,8 @@ func AddMovie(w http.ResponseWriter, r *http.Request) {
 }
 
 func AdminReviewUpdate(w http.ResponseWriter, r *http.Request) {
-	// r.PathValue("imdb_id") // for url paths like this /users/{id}
-	movieId := r.URL.Query().Get("imdb_id") // for paths like /path?imdb=123
+	movieId := r.PathValue("imdb_id") // for url paths like this /users/{id}
+	// movieId := r.URL.Query().Get("imdb_id") // for paths like /path?imdb=123
 
 	if movieId == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -227,4 +229,106 @@ func GetRankings() ([]models.Ranking, error) {
 	}
 
 	return rankings, nil
+}
+
+func GetRecommendedMovies(w http.ResponseWriter, r *http.Request) {
+	userId, err := utils.GetDataFromContext(r)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "user id not found in context"})
+		return
+	}
+
+	favourite_genres, err := GetUserFavouriteGenres(string(userId))
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "error is " + err.Error()})
+		return
+	}
+
+	findOptions := options.Find()
+	findOptions.SetLimit(5)
+	filter := bson.M{"genre.genre_name": bson.M{"$in": favourite_genres}}
+
+	var ctx, cancel = context.WithTimeout(r.Context(), 100*time.Second)
+
+	defer cancel()
+
+	cursor, err := movieCollection.Find(ctx, filter, findOptions)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "error fetching recommended movies"})
+		return
+	}
+
+	defer cursor.Close(ctx)
+
+	var recommendedMovies []models.Movie
+
+	if err := cursor.All(ctx, &recommendedMovies); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(&recommendedMovies)
+}
+
+func GetUserFavouriteGenres(userId string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
+
+	filter := bson.D{
+		bson.E{
+			Key:   "user_id",
+			Value: userId,
+		},
+	}
+
+	projection := bson.D{
+		bson.E{
+			Key:   "favourite_genre.genre_name",
+			Value: 1,
+		},
+		bson.E{
+			Key:   "_id",
+			Value: 0,
+		},
+	}
+
+	opts := options.FindOne().SetProjection(projection)
+	var result bson.M
+	err := userCollection.FindOne(ctx, filter, opts).Decode(&result)
+
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return []string{}, nil
+		}
+	}
+
+	favGenresArray, ok := result["favourite_genres"].(bson.A)
+
+	if !ok {
+		return []string{}, errors.New("unable to retrive favourite genres for user")
+	}
+
+	var genreNames []string
+
+	for _, item := range favGenresArray {
+		if genreMap, ok := item.(bson.D); ok {
+			for _, elem := range genreMap {
+				if elem.Key == "genre" {
+					if name, ok := elem.Value.(string); ok {
+						genreNames = append(genreNames, name)
+					}
+				}
+			}
+		}
+	}
+
+	return genreNames, nil
 }
