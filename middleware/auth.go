@@ -9,26 +9,34 @@ import (
 
 func Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		/*
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			// stringArray := strings.Split(authHeader, "Bearer ")
+			// tokenString := stringArray[1]
+			tokenString := authHeader[len("Bearer "):]
+
+			if tokenString == "" {
+				http.Error(w, "Unauthorized bearer token is required", http.StatusUnauthorized)
+				return
+			}
+
+		*/
+		tokenStringTemp, err := r.Cookie("access_token")
+		if err != nil {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
-		// stringArray := strings.Split(authHeader, "Bearer ")
-		// tokenString := stringArray[1]
-		tokenString := authHeader[len("Bearer "):]
-
-		if tokenString == "" {
-			http.Error(w, "Unauthorized bearer token is required", http.StatusUnauthorized)
-			return
-		}
-
-		claims, err := utils.ValidateToken(tokenString)
+		claims, err := utils.ValidateToken(tokenStringTemp.Value)
 
 		if err != nil {
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
+
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, utils.UserID, claims.UserId)
 		ctx = context.WithValue(ctx, utils.Role, claims.Role)

@@ -11,7 +11,7 @@ func CORS(next http.Handler) http.Handler {
 		if r.Method == http.MethodOptions {
 			return
 		}
-
+		w.Header().Set("Content-Type", "application/json")
 		next.ServeHTTP(w, r)
 	})
 }
